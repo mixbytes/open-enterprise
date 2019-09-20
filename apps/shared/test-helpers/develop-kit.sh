@@ -72,7 +72,7 @@ if multi_parcel_running; then
 fi
 
 start_multi_parcel() {
-	lerna run dev --log-level=silent --parallel "$@" &
+	lerna run dev --log-level=silent "$@" &
 	parallel_pid=$!
 }
 
