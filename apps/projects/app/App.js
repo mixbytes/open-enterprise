@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { ApolloProvider } from 'react-apollo'
 
 import { useAragonApi } from './api-react'
@@ -29,6 +29,8 @@ import { LoadingAnimation } from './components/Shared'
 import { EmptyWrapper } from './components/Shared'
 import { Error } from './components/Card'
 
+let popupRef = null
+
 const App = () => {
   const { api, appState } = useAragonApi()
   const [ activeIndex, setActiveIndex ] = useState(
@@ -38,7 +40,6 @@ const App = () => {
   const [ githubLoading, setGithubLoading ] = useState(false)
   const [ panel, setPanel ] = useState(null)
   const [ panelProps, setPanelProps ] = useState(null)
-  const [ popupRef, setPopupRef ] = useState(null)
 
   const {
     repos = [],
@@ -50,15 +51,14 @@ const App = () => {
 
   const client = github.token ? initApolloClient(github.token) : null
 
-  const handlePopupMessage = async message => {
-    if (message.data.from !== 'popup') return
-    if (message.data.name === 'code') {
-      // TODO: Optimize the listeners lifecycle, ie: remove on unmount
-      window.removeEventListener('message', handlePopupMessage)
+  const handlePopupMessage = useCallback(async message => {
+    if (!popupRef) return
+    if (message.source !== popupRef) return
 
-      const code = message.data.value
+    switch (message.data.name) {
+    case 'code':
       try {
-        const token = await getToken(code)
+        const token = await getToken(message.data.code)
         setGithubLoading(false)
         api.trigger(REQUESTED_GITHUB_TOKEN_SUCCESS, {
           status: STATUS.AUTHENTICATED,
@@ -72,8 +72,21 @@ const App = () => {
           token: null,
         })
       }
+      break
+    case 'ping':
+      // The popup cannot read `window.opener.location` directly because of
+      // same-origin policies. Instead, it pings this page, this page pings
+      // back, and the location info can be read from that ping.
+      popupRef.postMessage({ name: 'ping' }, '*')
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('message', handlePopupMessage)
+    return () => {
+      window.removeEventListener('message', handlePopupMessage)
+    }
+  })
 
   const changeActiveIndex = data => {
     setActiveIndex(data)
@@ -90,13 +103,8 @@ const App = () => {
   }
 
   const handleGithubSignIn = () => {
-    // The popup is launched, its ref is checked and saved in the state in one step
     setGithubLoading(true)
-
-    setPopupRef(githubPopup(popupRef))
-
-    // Listen for the github redirection with the auth-code encoded as url param
-    window.addEventListener('message', handlePopupMessage)
+    popupRef = githubPopup(popupRef)
   }
 
   const handleSelect = index => {
