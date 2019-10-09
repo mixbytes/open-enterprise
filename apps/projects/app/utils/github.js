@@ -13,6 +13,7 @@ const STATUS = {
 // TODO: Extract to an external js utility to keep this file clean
 // Variable fields depending on the execution environment:
 // TODO: This should be dynamically set depending on the execution environment (dev, prod...)
+const AUTH_URI = 'https://tps.autark.xyz/authenticate'
 export const CLIENT_ID = '686f96197cc9bb07a43d'
 export const GITHUB_URI = 'https://github.com/login/oauth/authorize'
 
@@ -49,6 +50,18 @@ export const githubPopup = (popup = null) => {
     )
   } else popup.focus()
   return popup
+}
+
+/**
+ * Sends an http request to the AUTH_URI with the auth code obtained from the oauth flow
+ * @param {string} code
+ * @returns {string} The authentication token obtained from the auth server
+ */
+export const getToken = async code => {
+  const response = await fetch(`${AUTH_URI}/${code}`)
+  const json = await response.json()
+
+  return json.token
 }
 
 export { STATUS }
