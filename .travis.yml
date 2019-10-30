@@ -1,14 +1,14 @@
 # ensure running in a container for fast boot, travis has these requirements:
-sudo: false
-dist: 'trusty'
+#sudo: false
+#dist: 'trusty'
 
 # these are executed in order. each must pass for the next to be run
 stages:
   - precache # warm up cache for default Node.js version
-  - lint # lint code and docs
-  - test # all tests
-  - name: deploy
-    if: branch = dev AND type = push
+  #- lint # lint code and docs
+  #- test # all tests
+  - deploy #name: deploy
+    #if: branch = dev AND type = push
 
 # defaults
 language: node_js
@@ -27,40 +27,40 @@ jobs:
       install:
         - travis_wait npm i
 
-    - stage: lint
-      name: Lint contracts and frontend apps
-      install: pwd # override to avoid npm i again
-      script: npm run lint
+    #- stage: lint
+    #  name: Lint contracts and frontend apps
+    #  install: pwd # override to avoid npm i again
+    #  script: npm run lint
 
-    - stage: test
-      script: travis_wait 60 npm run coverage -- --scope=@tps/apps-address-book
-      name: Address Book app tests and coverage report
-      install: npm run bootstrap
-      after_success: npm run coveralls
+    #- stage: test
+    #  script: travis_wait 60 npm run coverage -- --scope=@tps/apps-address-book
+    #  name: Address Book app tests and coverage report
+    #  install: pwd #npm run bootstrap
+    #  after_success: npm run coveralls
 
-    - stage: test
-      script: travis_wait 60 npm run coverage -- --scope=@tps/apps-allocations
-      name: Allocations app tests and coverage report
-      install: npm run bootstrap
-      after_success: npm run coveralls
+    #- stage: test
+    #  script: travis_wait 60 npm run coverage -- --scope=@tps/apps-allocations
+    #  name: Allocations app tests and coverage report
+    #  install: npm run bootstrap
+    #  after_success: npm run coveralls
 
-    - stage: test
-      script: travis_wait 60 npm run coverage -- --scope=@tps/apps-projects
-      name: Projects app tests and coverage report
-      install: npm run bootstrap
-      after_success: npm run coveralls
+    #- stage: test
+    #  script: travis_wait 60 npm run coverage -- --scope=@tps/apps-projects
+    #  name: Projects app tests and coverage report
+    #  install: npm run bootstrap
+    #  after_success: npm run coveralls
 
-    - stage: test
-      script: travis_wait 60 npm run coverage -- --scope=@tps/apps-dot-voting
-      name: Dot Voting app tests and coverage report
-      install: npm run bootstrap
-      after_success: npm run coveralls
+    #- stage: test
+    #  script: travis_wait 60 npm run coverage -- --scope=@tps/apps-dot-voting
+    #  name: Dot Voting app tests and coverage report
+    #  install: npm run bootstrap
+    #  after_success: npm run coveralls
 
-    - stage: test
-      script: travis_wait 60 npm run coverage -- --scope=@tps/apps-rewards
-      name: Rewards app tests and coverage report
-      install: npm run bootstrap
-      after_success: npm run coveralls
+    #- stage: test
+    #  script: travis_wait 60 npm run coverage -- --scope=@tps/apps-rewards
+    #  name: Rewards app tests and coverage report
+    #  install: npm run bootstrap
+    #  after_success: npm run coveralls
 
     - stage: deploy
       before_install:
@@ -69,9 +69,10 @@ jobs:
         -in shared/deployments/rinkeby_key.json.enc -out $HOME/.aragon/rinkeby_key.json -d
       - ls $HOME/.aragon
       install:
-        - travis_wait npm i -g @aragon/cli@5.6.2
+        - travis_wait npm i -g @aragon/cli@6.3.3
+        - aragon ipfs install --skip-confirmation
         - npm run bootstrap
-      script: travis_wait 60 npm run publish:cd
+      script: npm run publish:cd #travis_wait 60 npm run publish:cd
 
 
 notifications:
