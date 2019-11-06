@@ -16,8 +16,16 @@ import {
 
 import { Form, FormField } from '../../Form'
 import { DateInput } from '../../../../../../shared/ui'
+import {
+  millisecondsToBlocks,
+  MILLISECONDS_IN_A_DAY,
+  MILLISECONDS_IN_A_WEEK,
+  MILLISECONDS_IN_A_YEAR,
+  MILLISECONDS_IN_A_MONTH,
+} from '../../../../../../shared/ui/utils'
 import moment from 'moment'
 import { isBefore } from 'date-fns'
+import { BigNumber } from 'bignumber.js'
 import { isAddress } from '../../../utils/web3-utils'
 import { ETHER_TOKEN_VERIFIED_BY_SYMBOL } from '../../../utils/verified-tokens'
 import TokenSelectorInstance from './TokenSelectorInstance'
@@ -74,6 +82,8 @@ const INITIAL_STATE = {
   disbursement: '',
   disbursementUnit: MONTHS,
   disbursements: [tomorrow],
+  disbursementBlocks: Array(50).fill('loading...'),
+  currentBlockNumber: 0,
   draftSubmitted: false,
   errors: [],
   warnings: [],
@@ -641,6 +651,86 @@ class NewRewardClass extends React.Component {
     )
   }
 
+  getBlockProps = currentBlock => {
+    const {
+      amount,
+      amountToken,
+      rewardType,
+      dateReference,
+      dateStart,
+      dateEnd,
+      disbursement,
+      disbursementUnit,
+      disbursements,
+    } = this.state
+    const BLOCK_PADDING = 1
+    const amountBN = new BigNumber(amount)
+    const tenBN =  new BigNumber(10)
+    const decimalsBN = new BigNumber(amountToken.decimals)
+    const amountWei = amountBN.times(tenBN.pow(decimalsBN))
+    let startBlock = currentBlock + millisecondsToBlocks(Date.now(), dateStart)
+    let occurrences, isMerit, duration
+    if (rewardType === ONE_TIME_DIVIDEND || rewardType === ONE_TIME_MERIT) {
+      occurrences = 1
+    }
+    if (rewardType === ONE_TIME_MERIT) {
+      isMerit = true
+      duration = millisecondsToBlocks(dateStart, dateEnd)
+    } else {
+      isMerit = false
+    }
+    if (rewardType === RECURRING_DIVIDEND) {
+      occurrences = disbursements.length
+      switch (disbursementUnit) {
+      case 'Days':
+        duration = millisecondsToBlocks(Date.now(), disbursement * MILLISECONDS_IN_A_DAY + Date.now())
+        break
+      case 'Weeks':
+        duration = millisecondsToBlocks(Date.now(), disbursement * MILLISECONDS_IN_A_WEEK + Date.now())
+        break
+      case 'Years':
+        duration = millisecondsToBlocks(Date.now(), disbursement * MILLISECONDS_IN_A_YEAR + Date.now())
+        break
+      default:
+        duration = millisecondsToBlocks(Date.now(), disbursement * MILLISECONDS_IN_A_MONTH + Date.now())
+      }
+      startBlock -= duration
+    }
+    if(rewardType === ONE_TIME_DIVIDEND){
+      const rawBlockDuration = millisecondsToBlocks(Date.now(), dateReference)
+      startBlock = dateReference <= new Date() ? currentBlock + rawBlockDuration - BLOCK_PADDING : currentBlock 
+      duration = dateReference <= new Date() ? BLOCK_PADDING : rawBlockDuration
+    }
+    this.setState({
+      isMerit,
+      amountWei,
+      startBlock,
+      duration,
+      occurrences,
+    })
+    return [ startBlock, duration, occurrences ]
+  }
+
+  setDisbursementBlocks = currentBlockNumber => {
+    if (currentBlockNumber === this.state.currentBlockNumber)
+      return
+    const [
+      startBlock,
+      duration,
+      occurrences,
+    ] = this.getBlockProps(currentBlockNumber)
+    const disbursementBlocks = []
+    for (let i = 1; i <= occurrences; i ++) {
+      const block = startBlock + duration * i
+      disbursementBlocks.push(block)
+    }
+    console.log(disbursementBlocks)
+    this.setState({
+      currentBlockNumber,
+      disbursementBlocks,
+    })
+  }
+
   showSummary = () => {
     const {
       description,
@@ -653,7 +743,10 @@ class NewRewardClass extends React.Component {
       dateStart,
       dateEnd,
       disbursements,
+      disbursementBlocks,
     } = this.state
+    this.props.app.web3Eth('getBlockNumber')
+      .subscribe(this.setDisbursementBlocks)
     return (
       <VerticalContainer>
         <VerticalSpace />
@@ -685,11 +778,11 @@ class NewRewardClass extends React.Component {
             <Content>{dateReference.toDateString()}</Content>
           )}
           {rewardType === RECURRING_DIVIDEND &&
-             disbursements.map((disbursement, i) => (
-               <Content key={i}>
-                 {disbursement.toDateString()}
-               </Content>
-             ))}
+            disbursements.map((disbursement, i) => (
+              <Content key={i}>
+                {disbursement.toDateString()} (block: {disbursementBlocks[i]})
+              </Content>
+            ))}
           {rewardType === ONE_TIME_MERIT && (
             <Content>
               {dateStart.toDateString()}{' - '}{dateEnd.toDateString()}
